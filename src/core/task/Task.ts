@@ -2528,7 +2528,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this.api = buildApiHandler(stateApiConfiguration)
 		}
 
-		const apiConfiguration = this.apiConfiguration
+		const {apiConfiguration} = this
 
 		this.consecutiveMistakeLimit = apiConfiguration?.consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 
