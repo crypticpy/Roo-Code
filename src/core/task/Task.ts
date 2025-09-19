@@ -2526,12 +2526,11 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		if (stateApiConfiguration && !deepEqual(stateApiConfiguration, this.apiConfiguration)) {
 			Object.assign(this.apiConfiguration, stateApiConfiguration)
 			this.api = buildApiHandler(stateApiConfiguration)
+			this.consecutiveMistakeLimit = stateApiConfiguration.consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
+		} else {
+			const { apiConfiguration } = this
+			this.consecutiveMistakeLimit = apiConfiguration?.consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 		}
-
-		const {apiConfiguration} = this
-
-		this.consecutiveMistakeLimit = apiConfiguration?.consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
-
 		// Get condensing configuration for automatic triggers.
 		const customCondensingPrompt = state?.customCondensingPrompt
 		const condensingApiConfigId = state?.condensingApiConfigId
