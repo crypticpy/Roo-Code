@@ -60,6 +60,8 @@ import {
 	Collapsible,
 	CollapsibleTrigger,
 	CollapsibleContent,
+	Input,
+	ToggleSwitch,
 } from "@src/components/ui"
 
 import {
@@ -133,7 +135,7 @@ const ApiOptions = ({
 	setErrorMessage,
 }: ApiOptionsProps) => {
 	const { t } = useAppTranslation()
-	const { organizationAllowList, cloudIsAuthenticated } = useExtensionState()
+	const { organizationAllowList, cloudIsAuthenticated, listApiConfigMeta = [] } = useExtensionState()
 
 	const [customHeaders, setCustomHeaders] = useState<[string, string][]>(() => {
 		const headers = apiConfiguration?.openAiHeaders || {}
@@ -782,6 +784,87 @@ const ApiOptions = ({
 							}
 							onChange={(value) => setApiConfigurationField("consecutiveMistakeLimit", value)}
 						/>
+						<div className="rounded-md border border-vscode-sideBar-border bg-card/40 p-3">
+							<div className="flex items-start justify-between gap-2">
+								<div>
+									<label className="block font-medium">
+										{t("settings:providers.roundRobin.title")}
+									</label>
+									<p className="mt-1 text-xs text-vscode-descriptionForeground">
+										{t("settings:providers.roundRobin.description")}
+									</p>
+								</div>
+								<ToggleSwitch
+									checked={!!apiConfiguration.roundRobinEnabled}
+									onChange={() => {
+										const isEnabled = !apiConfiguration.roundRobinEnabled
+										setApiConfigurationField("roundRobinEnabled", isEnabled)
+
+										if (isEnabled) {
+											if (!apiConfiguration.roundRobinOrder) {
+												const existingOrders =
+													listApiConfigMeta
+														?.map((profile) => profile.roundRobinOrder ?? 0)
+														.filter((order) => order > 0) ?? []
+												const nextOrder =
+													existingOrders.length > 0 ? Math.max(...existingOrders) + 1 : 1
+												setApiConfigurationField("roundRobinOrder", nextOrder)
+											}
+
+											if (!apiConfiguration.roundRobinMessagesPerTurn) {
+												setApiConfigurationField("roundRobinMessagesPerTurn", 1)
+											}
+										}
+									}}
+									aria-label={t("settings:providers.roundRobin.enableLabel")}
+									data-testid="round-robin-toggle"
+								/>
+							</div>
+
+							{apiConfiguration.roundRobinEnabled && (
+								<div className="mt-3 grid gap-3 sm:grid-cols-2">
+									<div>
+										<label className="block font-medium mb-1">
+											{t("settings:providers.roundRobin.orderLabel")}
+										</label>
+										<Input
+											type="number"
+											min={1}
+											value={apiConfiguration.roundRobinOrder ?? ""}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+												const value = Number.parseInt(event.target.value, 10)
+												setApiConfigurationField(
+													"roundRobinOrder",
+													Number.isNaN(value) ? undefined : Math.max(1, value),
+												)
+											}}
+											data-testid="round-robin-order"
+										/>
+									</div>
+									<div>
+										<label className="block font-medium mb-1">
+											{t("settings:providers.roundRobin.messagesPerTurnLabel")}
+										</label>
+										<Input
+											type="number"
+											min={1}
+											value={apiConfiguration.roundRobinMessagesPerTurn ?? ""}
+											onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+												const value = Number.parseInt(event.target.value, 10)
+												setApiConfigurationField(
+													"roundRobinMessagesPerTurn",
+													Number.isNaN(value) ? undefined : Math.max(1, value),
+												)
+											}}
+											data-testid="round-robin-messages"
+										/>
+										<p className="mt-1 text-xs text-vscode-descriptionForeground">
+											{t("settings:providers.roundRobin.messagesPerTurnHelp")}
+										</p>
+									</div>
+								</div>
+							)}
+						</div>
 						{selectedProvider === "openrouter" &&
 							openRouterModelProviders &&
 							Object.keys(openRouterModelProviders).length > 0 && (

@@ -302,6 +302,9 @@ export class ProviderSettingsManager {
 					id: apiConfig.id || "",
 					apiProvider: apiConfig.apiProvider,
 					modelId: this.cleanModelId(getModelId(apiConfig)),
+					roundRobinEnabled: apiConfig.roundRobinEnabled,
+					roundRobinOrder: apiConfig.roundRobinOrder,
+					roundRobinMessagesPerTurn: apiConfig.roundRobinMessagesPerTurn,
 				}))
 			})
 		} catch (error) {

@@ -4,7 +4,12 @@ import Anthropic from "@anthropic-ai/sdk"
 import * as vscode from "vscode"
 import axios from "axios"
 
-import { type ProviderSettingsEntry, type ClineMessage, ORGANIZATION_ALLOW_ALL } from "@roo-code/types"
+import {
+	type ProviderSettings,
+	type ProviderSettingsEntry,
+	type ClineMessage,
+	ORGANIZATION_ALLOW_ALL,
+} from "@roo-code/types"
 import { TelemetryService } from "@roo-code/telemetry"
 
 import { ExtensionMessage, ExtensionState } from "../../../shared/ExtensionMessage"
@@ -2148,6 +2153,98 @@ describe("ClineProvider", () => {
 			expect(updateGlobalStateSpy).toHaveBeenCalledWith("listApiConfigMeta", [
 				{ name: "test-config", id: "test-id", apiProvider: "anthropic" },
 			])
+		})
+	})
+
+	describe("prepareRoundRobinForRequest", () => {
+		const profilesMeta: ProviderSettingsEntry[] = [
+			{
+				id: "id-a",
+				name: "profile-a",
+				apiProvider: "anthropic",
+				roundRobinEnabled: true,
+				roundRobinOrder: 1,
+				roundRobinMessagesPerTurn: 2,
+			},
+			{
+				id: "id-b",
+				name: "profile-b",
+				apiProvider: "anthropic",
+				roundRobinEnabled: true,
+				roundRobinOrder: 2,
+				roundRobinMessagesPerTurn: 1,
+			},
+			{
+				id: "id-c",
+				name: "profile-c",
+				apiProvider: "anthropic",
+				roundRobinEnabled: true,
+				roundRobinOrder: 3,
+				roundRobinMessagesPerTurn: 1,
+			},
+		]
+
+		beforeEach(async () => {
+			await provider.contextProxy.setValues({
+				listApiConfigMeta: profilesMeta,
+				currentApiConfigName: "profile-a",
+				mode: defaultModeSlug,
+			})
+
+			await provider.contextProxy.setProviderSettings({
+				apiProvider: "anthropic",
+				apiModelId: "model-a",
+			} as ProviderSettings)
+
+			vi.spyOn(provider, "postStateToWebview").mockResolvedValue(undefined)
+		})
+
+		test("rotates enabled profiles according to order and message limits", async () => {
+			const activateSpy = vi
+				.spyOn(provider, "activateProviderProfile")
+				.mockImplementation(async ({ id }: { id: string }) => {
+					const entry = profilesMeta.find((profile) => profile.id === id)
+					if (!entry) {
+						throw new Error("Profile not found")
+					}
+
+					await provider.contextProxy.setValue("currentApiConfigName", entry.name)
+					await provider.contextProxy.setProviderSettings({
+						apiProvider: entry.apiProvider ?? "anthropic",
+						apiModelId: entry.modelId ?? "model-placeholder",
+					} as ProviderSettings)
+				})
+
+			const stateForMode = () => (provider as any).roundRobinState.get(defaultModeSlug)
+
+			await provider.prepareRoundRobinForRequest()
+			expect(activateSpy).not.toHaveBeenCalled()
+			expect(provider.contextProxy.getValue("currentApiConfigName")).toBe("profile-a")
+			expect(stateForMode()).toEqual({ profileId: "id-a", messagesRemaining: 1 })
+
+			await provider.prepareRoundRobinForRequest()
+			expect(activateSpy).not.toHaveBeenCalled()
+			expect(stateForMode()).toEqual({ profileId: "id-a", messagesRemaining: 0 })
+
+			await provider.prepareRoundRobinForRequest()
+			expect(activateSpy).toHaveBeenCalledTimes(1)
+			expect(activateSpy).toHaveBeenLastCalledWith({ id: "id-b" })
+			expect(provider.contextProxy.getValue("currentApiConfigName")).toBe("profile-b")
+			expect(stateForMode()).toEqual({ profileId: "id-b", messagesRemaining: 0 })
+
+			await provider.prepareRoundRobinForRequest()
+			expect(activateSpy).toHaveBeenCalledTimes(2)
+			expect(activateSpy).toHaveBeenLastCalledWith({ id: "id-c" })
+			expect(provider.contextProxy.getValue("currentApiConfigName")).toBe("profile-c")
+			expect(stateForMode()).toEqual({ profileId: "id-c", messagesRemaining: 0 })
+
+			await provider.prepareRoundRobinForRequest()
+			expect(activateSpy).toHaveBeenCalledTimes(3)
+			expect(activateSpy).toHaveBeenLastCalledWith({ id: "id-a" })
+			expect(provider.contextProxy.getValue("currentApiConfigName")).toBe("profile-a")
+			expect(stateForMode()).toEqual({ profileId: "id-a", messagesRemaining: 1 })
+
+			activateSpy.mockRestore()
 		})
 	})
 

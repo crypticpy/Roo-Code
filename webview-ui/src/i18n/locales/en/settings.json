@@ -235,6 +235,14 @@
 		"searchProviderPlaceholder": "Search providers",
 		"noProviderMatchFound": "No providers found",
 		"noMatchFound": "No matching profiles found",
+		"roundRobin": {
+			"title": "Round robin routing",
+			"description": "Distribute requests across enabled profiles to balance throughput and stay within rate limits.",
+			"enableLabel": "Enable round robin for this profile",
+			"orderLabel": "Rotation order",
+			"messagesPerTurnLabel": "Messages per turn",
+			"messagesPerTurnHelp": "Number of consecutive messages to send before switching to the next profile."
+		},
 		"vscodeLmDescription": " The VS Code Language Model API allows you to run models provided by other VS Code extensions (including but not limited to GitHub Copilot). The easiest way to get started is to install the Copilot and Copilot Chat extensions from the VS Code Marketplace.",
 		"awsCustomArnUse": "Enter a valid Amazon Bedrock ARN for the model you want to use. Format examples:",
 		"awsCustomArnDesc": "Make sure the region in the ARN matches your selected AWS Region above.",

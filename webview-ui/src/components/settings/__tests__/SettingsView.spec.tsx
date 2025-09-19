@@ -150,6 +150,17 @@ vi.mock("@/components/ui", () => ({
 			{children}
 		</div>
 	),
+	ToggleSwitch: ({ checked, onChange, disabled, "aria-label": ariaLabel, "data-testid": dataTestId }: any) => (
+		<button
+			type="button"
+			role="switch"
+			aria-checked={checked}
+			aria-label={ariaLabel}
+			disabled={disabled}
+			data-testid={dataTestId}
+			onClick={() => onChange && onChange()}
+		/>
+	),
 	SelectContent: ({ children }: any) => <div data-testid="select-content">{children}</div>,
 	SelectGroup: ({ children }: any) => <div data-testid="select-group">{children}</div>,
 	SelectItem: ({ children, value }: any) => (

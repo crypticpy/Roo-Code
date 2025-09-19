@@ -5,6 +5,7 @@ import crypto from "crypto"
 import EventEmitter from "events"
 
 import { Anthropic } from "@anthropic-ai/sdk"
+import deepEqual from "fast-deep-equal"
 import delay from "delay"
 import pWaitFor from "p-wait-for"
 import { serializeError } from "serialize-error"
@@ -218,7 +219,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	private pauseInterval: NodeJS.Timeout | undefined
 
 	// API
-	readonly apiConfiguration: ProviderSettings
+	apiConfiguration: ProviderSettings
 	api: ApiHandler
 	private static lastGlobalApiRequestTime?: number
 	private autoApprovalHandler: AutoApprovalHandler
@@ -2497,10 +2498,20 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	}
 
 	public async *attemptApiRequest(retryAttempt: number = 0): ApiStream {
-		const state = await this.providerRef.deref()?.getState()
+		const provider = this.providerRef.deref()
+
+		try {
+			await provider?.prepareRoundRobinForRequest?.()
+		} catch (error) {
+			console.error(
+				`[Task#${this.taskId}] Failed to prepare round robin provider:`,
+				error instanceof Error ? error.message : error,
+			)
+		}
+
+		const state = await provider?.getState()
 
 		const {
-			apiConfiguration,
 			autoApprovalEnabled,
 			alwaysApproveResubmit,
 			requestDelaySeconds,
@@ -2509,6 +2520,17 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			autoCondenseContextPercent = 100,
 			profileThresholds = {},
 		} = state ?? {}
+
+		const stateApiConfiguration = state?.apiConfiguration
+
+		if (stateApiConfiguration && !deepEqual(stateApiConfiguration, this.apiConfiguration)) {
+			this.apiConfiguration = stateApiConfiguration
+			this.api = buildApiHandler(stateApiConfiguration)
+		}
+
+		const apiConfiguration = this.apiConfiguration
+
+		this.consecutiveMistakeLimit = apiConfiguration?.consecutiveMistakeLimit ?? DEFAULT_CONSECUTIVE_MISTAKE_LIMIT
 
 		// Get condensing configuration for automatic triggers.
 		const customCondensingPrompt = state?.customCondensingPrompt

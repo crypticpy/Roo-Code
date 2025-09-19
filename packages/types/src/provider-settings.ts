@@ -156,6 +156,9 @@ export const providerSettingsEntrySchema = z.object({
 	name: z.string(),
 	apiProvider: providerNamesSchema.optional(),
 	modelId: z.string().optional(),
+	roundRobinEnabled: z.boolean().optional(),
+	roundRobinOrder: z.number().int().min(1).optional(),
+	roundRobinMessagesPerTurn: z.number().int().min(1).optional(),
 })
 
 export type ProviderSettingsEntry = z.infer<typeof providerSettingsEntrySchema>
@@ -172,6 +175,10 @@ const baseProviderSettingsSchema = z.object({
 	modelTemperature: z.number().nullish(),
 	rateLimitSeconds: z.number().optional(),
 	consecutiveMistakeLimit: z.number().min(0).optional(),
+
+	roundRobinEnabled: z.boolean().optional(),
+	roundRobinOrder: z.number().int().min(1).optional(),
+	roundRobinMessagesPerTurn: z.number().int().min(1).optional(),
 
 	// Model reasoning.
 	enableReasoningEffort: z.boolean().optional(),

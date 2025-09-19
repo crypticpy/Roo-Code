@@ -139,6 +139,9 @@ export class ClineProvider
 	private pendingOperations: Map<string, PendingEditOperation> = new Map()
 	private static readonly PENDING_OPERATION_TIMEOUT_MS = 30000 // 30 seconds
 
+	private roundRobinState: Map<string, { profileId: string; messagesRemaining: number }> = new Map()
+	private roundRobinLock: Promise<void> = Promise.resolve()
+
 	public isViewLaunched = false
 	public settingsImportedAt?: number
 	public readonly latestAnnouncementId = "sep-2025-roo-code-cloud" // Roo Code Cloud announcement
@@ -1928,6 +1931,103 @@ export class ClineProvider
 	 * https://dev.to/kompotkot/how-to-use-secretstorage-in-your-vscode-extensions-2hco
 	 * https://www.eliostruyf.com/devhack-code-extension-storage-options/
 	 */
+
+	private withRoundRobinLock<T>(cb: () => Promise<T>): Promise<T> {
+		const next = this.roundRobinLock.then(cb)
+		this.roundRobinLock = next.then(
+			() => undefined,
+			() => undefined,
+		)
+		return next
+	}
+
+	public async prepareRoundRobinForRequest(): Promise<void> {
+		await this.withRoundRobinLock(() => this.prepareRoundRobinForRequestInternal())
+	}
+
+	private async prepareRoundRobinForRequestInternal(): Promise<void> {
+		try {
+			const stateValues = this.contextProxy.getValues()
+			const mode = stateValues.mode ?? defaultModeSlug
+			const listApiConfigMeta = Array.isArray(stateValues.listApiConfigMeta) ? stateValues.listApiConfigMeta : []
+
+			const roundRobinProfiles = listApiConfigMeta
+				.filter((entry): entry is ProviderSettingsEntry & { id: string } =>
+					Boolean(entry.roundRobinEnabled && entry.id),
+				)
+				.sort((a, b) => {
+					const orderA = a.roundRobinOrder ?? Number.MAX_SAFE_INTEGER
+					const orderB = b.roundRobinOrder ?? Number.MAX_SAFE_INTEGER
+
+					if (orderA !== orderB) {
+						return orderA - orderB
+					}
+
+					return a.name.localeCompare(b.name)
+				})
+
+			if (roundRobinProfiles.length === 0) {
+				this.roundRobinState.delete(mode)
+				return
+			}
+
+			const currentState = this.roundRobinState.get(mode)
+			const currentProfileName = stateValues.currentApiConfigName
+			const currentActiveEntry = listApiConfigMeta.find((entry) => entry.name === currentProfileName)
+
+			const getMessagesPerTurn = (entry: ProviderSettingsEntry) =>
+				Math.max(1, entry.roundRobinMessagesPerTurn ?? 1)
+
+			const findById = (id?: string) => roundRobinProfiles.find((entry) => entry.id === id)
+
+			let targetEntry: (ProviderSettingsEntry & { id: string }) | undefined
+
+			if (!currentState || !findById(currentState.profileId)) {
+				targetEntry = roundRobinProfiles[0]
+				this.roundRobinState.set(mode, {
+					profileId: targetEntry.id,
+					messagesRemaining: getMessagesPerTurn(targetEntry) - 1,
+				})
+			} else if ((currentState.messagesRemaining ?? 0) <= 0) {
+				const currentIndex = roundRobinProfiles.findIndex((entry) => entry.id === currentState.profileId)
+				const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % roundRobinProfiles.length
+				targetEntry = roundRobinProfiles[nextIndex]
+				this.roundRobinState.set(mode, {
+					profileId: targetEntry.id,
+					messagesRemaining: getMessagesPerTurn(targetEntry) - 1,
+				})
+			} else {
+				targetEntry = findById(currentState.profileId)
+
+				if (!targetEntry) {
+					targetEntry = roundRobinProfiles[0]
+					this.roundRobinState.set(mode, {
+						profileId: targetEntry.id,
+						messagesRemaining: getMessagesPerTurn(targetEntry) - 1,
+					})
+				} else {
+					this.roundRobinState.set(mode, {
+						profileId: targetEntry.id,
+						messagesRemaining: currentState.messagesRemaining - 1,
+					})
+				}
+			}
+
+			if (!targetEntry?.id) {
+				return
+			}
+
+			if (!currentActiveEntry || currentActiveEntry.id !== targetEntry.id) {
+				await this.activateProviderProfile({ id: targetEntry.id })
+			}
+		} catch (error) {
+			this.log(
+				`[prepareRoundRobinForRequest] Failed to prepare round robin provider: ${
+					error instanceof Error ? error.message : String(error)
+				}`,
+			)
+		}
+	}
 
 	async getState(): Promise<
 		Omit<
