@@ -110,6 +110,17 @@ vi.mock("@/components/ui", () => ({
 			</select>
 		</div>
 	),
+	ToggleSwitch: ({ checked, onChange, disabled, "aria-label": ariaLabel, "data-testid": dataTestId }: any) => (
+		<input
+			type="checkbox"
+			role="switch"
+			aria-label={ariaLabel}
+			data-testid={dataTestId || "toggle-switch"}
+			checked={checked}
+			disabled={disabled}
+			onChange={(event) => onChange && onChange(event.target.checked)}
+		/>
+	),
 	// Add Collapsible components
 	Collapsible: ({ children, open }: any) => (
 		<div className="collapsible-mock" data-open={open}>

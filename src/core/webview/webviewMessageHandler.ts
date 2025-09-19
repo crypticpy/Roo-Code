@@ -1652,6 +1652,7 @@ export const webviewMessageHandler = async (
 		case "enhancePrompt":
 			if (message.text) {
 				try {
+					await provider.prepareRoundRobinForRequest()
 					const state = await provider.getState()
 
 					const {
