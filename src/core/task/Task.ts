@@ -2524,7 +2524,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const stateApiConfiguration = state?.apiConfiguration
 
 		if (stateApiConfiguration && !deepEqual(stateApiConfiguration, this.apiConfiguration)) {
-			this.apiConfiguration = stateApiConfiguration
+			Object.assign(this.apiConfiguration, stateApiConfiguration)
 			this.api = buildApiHandler(stateApiConfiguration)
 		}
 
